@@ -405,8 +405,17 @@ Search the web (1-2 quick searches max), then respond with ONLY a valid JSON obj
 where "a" is the value on DATE_A, "b" on DATE_B, "source" is a short source name.`;
 
   try{
+    // ขั้นที่ 0: ตรวจการเชื่อมต่อระบบก่อน — ถ้าตั้งค่าไม่ครบจะเห็นสาเหตุจริงทันที ไม่ต้องรอค้นราคา
+    status.innerHTML = '<span class="spinner"></span> กำลังตรวจสอบการเชื่อมต่อระบบ…';
+    try{
+      await callClaude("Reply with only the word: OK", false, null);
+    }catch(e){
+      throw new Error(friendlyError(e.message));
+    }
+
     // ขั้นที่ 1: ค้นราคาจริงแบบขนาน 6 รายการพร้อมกัน (คำขอเล็ก เร็ว และไม่ชนลิมิตเวลาของเซิร์ฟเวอร์)
     let done = 0;
+    let lastError = null;
     const updateStatus = () => {
       status.innerHTML = `<span class="spinner"></span> กำลังค้นหาราคาจริงจากตลาดโลก… สำเร็จแล้ว ${done}/${ITEMS.length} รายการ`;
     };
@@ -420,6 +429,7 @@ where "a" is the value on DATE_A, "b" on DATE_B, "source" is a short source name
           const text = await callClaude(itemPrompt(item.key), true, null);
           result = extractJson(text);
         }catch(e){
+          lastError = e;
           if(attempt === 2) console.error(item.key, e);
         }
       }
@@ -427,7 +437,11 @@ where "a" is the value on DATE_A, "b" on DATE_B, "source" is a short source name
       return [item.key, result];
     }));
     const prices = Object.fromEntries(entries);
-    if(!ITEMS.some(it => prices[it.key])) throw new Error("ไม่พบข้อมูลราคาในผลลัพธ์ กรุณาลองกดอีกครั้ง");
+    if(!ITEMS.some(it => prices[it.key])){
+      throw new Error(lastError
+        ? "ทุกรายการล้มเหลว — สาเหตุ: " + friendlyError(lastError.message)
+        : "ไม่พบข้อมูลราคาในผลลัพธ์ กรุณาลองกดอีกครั้ง");
+    }
 
     render(prices, a, b);
 
@@ -525,6 +539,24 @@ function render(prices, a, b){
       </div>`);
   }
   document.getElementById("results").style.display = "block";
+}
+
+// แปลข้อความ error เป็นคำแนะนำที่นำไปแก้ได้ทันที
+function friendlyError(msg){
+  msg = String(msg || "");
+  if(/ANTHROPIC_API_KEY/.test(msg))
+    return "ยังไม่ได้ตั้งค่า ANTHROPIC_API_KEY บน Netlify → ไปที่ Site configuration → Environment variables เพิ่มตัวแปรนี้ แล้วกด Deploy ใหม่อีกครั้ง (สำคัญ: ต้อง deploy ซ้ำหลังตั้งค่า)";
+  if(/HTTP 404/.test(msg))
+    return "ไม่พบ Netlify Function (/.netlify/functions/claude) — มักเกิดจากการ deploy แบบลากไฟล์วาง (Drop) ซึ่งไม่ build Function ให้ กรุณา deploy ผ่าน GitHub (Import from Git) หรือ Netlify CLI แทน";
+  if(/401|invalid x-api-key|authentication/i.test(msg))
+    return "API key ไม่ถูกต้อง — ตรวจค่าใน ANTHROPIC_API_KEY ว่าคัดลอกมาครบ (ขึ้นต้นด้วย sk-ant-) แล้ว Deploy ใหม่";
+  if(/credit|billing|balance/i.test(msg))
+    return "เครดิตในบัญชี Anthropic ไม่เพียงพอ — เติมเครดิตได้ที่ console.anthropic.com → Billing";
+  if(/rate.?limit|429/i.test(msg))
+    return "เรียกใช้งานถี่เกินลิมิตชั่วคราว — รอประมาณ 1 นาทีแล้วลองใหม่";
+  if(/หมดเวลา|timed?.?out|502|504/i.test(msg))
+    return "คำขอใช้เวลานานเกินลิมิตของ Netlify Function — ลองกดใหม่อีกครั้ง (ถ้าเกิดบ่อย พิจารณาอัปเกรดแผน Netlify เพื่อขยายเวลา Function)";
+  return msg;
 }
 
 function showError(msg){
