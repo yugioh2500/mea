@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>เทียบต้นทุนวันเปิดซอง / วันคำนวณ — ฝ่ายพัสดุ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F6F8;
+    --card:#FFFFFF;
+    --ink:#3A3A3C;
+    --ink-soft:#6E6F72;
+    --line:#E3E5E9;
+    --copper:#F47B20;        /* ส้ม MEA */
+    --copper-deep:#D65F0A;
+    --copper-light:#FDEBDB;
+    --mea-dark:#5A5B5E;      /* เทาเข้มประกอบแบรนด์ */
+    --up:#C0392B;      /* ราคาขึ้น = ต้นทุนเพิ่ม */
+    --up-bg:#FBEAE7;
+    --down:#1E7F4F;    /* ราคาลง = ต้นทุนลด */
+    --down-bg:#E6F4EC;
+    --flat:#5B6B79;
+    --flat-bg:#EDF1F4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Sarabun',sans-serif;
+    min-height:100vh;
+    padding:0 16px 48px;
+  }
+  .wrap{max-width:920px;margin:0 auto}
+
+  header{
+    background:linear-gradient(120deg,#F6871F 0%,#F26F21 55%,#E85D0F 100%);
+    border-radius:0 0 18px 18px;
+    color:#fff;
+    padding:26px 24px 22px;
+    margin:0 -16px 24px;
+    display:flex;align-items:center;gap:16px;
+  }
+  .mea-badge{
+    flex:none;
+    width:54px;height:54px;border-radius:12px;
+    background:#fff;color:var(--copper-deep);
+    font-family:'Prompt',sans-serif;
+    font-weight:700;font-size:19px;letter-spacing:.02em;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+  }
+  .eyebrow{
+    font-family:'Prompt',sans-serif;
+    font-size:12.5px;letter-spacing:.1em;
+    color:#FFE3CC;
+    margin-bottom:4px;
+  }
+  h1{
+    font-family:'Prompt',sans-serif;
+    font-size:clamp(20px,3.6vw,27px);
+    font-weight:700;line-height:1.3;
+  }
+  .sub{color:#FFF0E2;font-size:13.5px;margin-top:5px}
+
+  .panel{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px;
+    box-shadow:0 1px 3px rgba(18,41,61,.06);
+  }
+  .dates{
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    gap:14px;align-items:end;
+  }
+  .field label{
+    display:block;font-size:13.5px;font-weight:600;
+    color:var(--ink);margin-bottom:6px;
+  }
+  .field .hint{font-weight:400;color:var(--ink-soft);font-size:12px}
+  .field input[type=date]{
+    width:100%;
+    font-family:'Prompt',sans-serif;
+    font-size:16px;font-weight:600;
+    color:var(--ink);
+    padding:11px 12px;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    background:#FBFCFD;
+  }
+  .field input[type=date]:focus{
+    outline:2px solid var(--copper);outline-offset:1px;border-color:var(--copper);
+  }
+  .arrow-mid{
+    font-family:'Prompt',sans-serif;
+    color:var(--copper);font-size:20px;font-weight:700;
+    padding-bottom:12px;text-align:center;
+  }
+  .go{
+    margin-top:16px;width:100%;
+    font-family:'Prompt',sans-serif;
+    font-size:17px;font-weight:700;letter-spacing:.02em;
+    color:#fff;
+    background:linear-gradient(135deg,var(--copper) 0%,var(--copper-deep) 100%);
+    border:none;border-radius:10px;
+    padding:14px;cursor:pointer;
+    transition:transform .1s ease, box-shadow .15s ease;
+  }
+  .go:hover{box-shadow:0 4px 14px rgba(176,92,36,.35)}
+  .go:active{transform:translateY(1px)}
+  .go:disabled{opacity:.55;cursor:wait;box-shadow:none}
+  .go:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+
+  .status{
+    margin-top:14px;font-size:14px;color:var(--ink-soft);
+    display:flex;align-items:center;gap:10px;min-height:22px;
+  }
+  .spinner{
+    width:16px;height:16px;border-radius:50%;
+    border:2.5px solid var(--copper-light);
+    border-top-color:var(--copper);
+    animation:spin .8s linear infinite;flex:none;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.5s}}
+
+  .cache-tools{margin-top:10px;font-size:12px;text-align:right}
+  .cache-tools a{color:var(--ink-soft);text-decoration:underline}
+  .cache-tools a:hover{color:var(--copper-deep)}
+  .error{
+    margin-top:14px;background:var(--up-bg);color:var(--up);
+    border:1px solid #EAC2BB;border-radius:10px;
+    padding:12px 14px;font-size:14px;display:none;
+  }
+
+  #results{margin-top:26px;display:none}
+  .period-line{
+    font-family:'Prompt',sans-serif;
+    font-size:14px;font-weight:600;color:var(--ink-soft);
+    margin-bottom:14px;
+  }
+  .period-line b{color:var(--ink)}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-left:5px solid var(--copper);
+    border-radius:12px;
+    padding:16px 16px 14px;
+    box-shadow:0 1px 3px rgba(18,41,61,.06);
+  }
+  .card h2{
+    font-family:'Prompt',sans-serif;
+    font-size:15.5px;font-weight:700;
+  }
+  .unit{font-size:12px;color:var(--ink-soft);margin-top:2px}
+  .prices{
+    display:grid;grid-template-columns:1fr 1fr;
+    gap:8px;margin:12px 0 10px;
+  }
+  .p-label{font-size:12px;color:var(--ink-soft)}
+  .p-val{
+    font-family:'Prompt',sans-serif;
+    font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;
+  }
+  .p-date{font-size:11px;color:var(--ink-soft)}
+  .delta{
+    border-radius:9px;padding:9px 12px;
+    display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  }
+  .delta .pct{
+    font-family:'Prompt',sans-serif;
+    font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;
+  }
+  .delta .abs{font-size:12.5px;font-weight:500}
+  .delta.up{background:var(--up-bg);color:var(--up)}
+  .delta.down{background:var(--down-bg);color:var(--down)}
+  .delta.flat{background:var(--flat-bg);color:var(--flat)}
+  .src{font-size:11px;color:var(--ink-soft);margin-top:8px}
+
+  /* ---- ส่วนวิเคราะห์สำหรับผู้บริหาร ---- */
+  #analysis{margin-top:26px;display:none}
+  .analysis-box{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:4px solid var(--ink);
+    border-radius:12px;
+    padding:22px;
+    box-shadow:0 1px 3px rgba(18,41,61,.06);
+  }
+  .analysis-box h2{
+    font-family:'Prompt',sans-serif;
+    font-size:18px;font-weight:700;margin-bottom:4px;
+  }
+  .analysis-sub{font-size:13px;color:var(--ink-soft);margin-bottom:16px}
+  .a-section{margin-bottom:16px}
+  .a-section:last-child{margin-bottom:0}
+  .a-section h3{
+    font-family:'Prompt',sans-serif;
+    font-size:14px;font-weight:700;
+    color:var(--copper-deep);
+    margin-bottom:6px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .a-section h3::before{
+    content:"";display:inline-block;width:10px;height:10px;
+    background:var(--copper);border-radius:2px;
+  }
+  .a-section p{font-size:14.5px;line-height:1.85;white-space:pre-line}
+  .analysis-loading{
+    display:flex;align-items:center;gap:10px;
+    font-size:14px;color:var(--ink-soft);padding:6px 0;
+  }
+
+  .note{
+    margin-top:20px;font-size:12.5px;color:var(--ink-soft);
+    background:var(--copper-light);
+    border-radius:10px;padding:12px 14px;line-height:1.6;
+  }
+
+  @media (max-width:640px){
+    .dates{grid-template-columns:1fr}
+    .arrow-mid{padding:0;transform:rotate(90deg)}
+    .cards{grid-template-columns:1fr}
+  }
+  @media print{
+    body{background:#fff;padding:0}
+    .panel,.note{display:none}
+    .card,.analysis-box{box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mea-badge" aria-hidden="true">MEA</div>
+    <div>
+      <div class="eyebrow">การไฟฟ้านครหลวง · ฝ่ายพัสดุ</div>
+      <h1>เทียบต้นทุนวันเปิดซอง กับ ต้นทุนวันคำนวณ</h1>
+      <div class="sub">น้ำมัน · ทองแดง · อะลูมิเนียม · เหล็ก · THB/USD · THB/CNY — พร้อมบทวิเคราะห์ประกอบการรายงานผู้บริหาร</div>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="dates">
+      <div class="field">
+        <label for="dateA">ต้นทุนวันเปิดซอง <span class="hint">(วันยื่น/เปิดซองราคา)</span></label>
+        <input type="date" id="dateA">
+      </div>
+      <div class="arrow-mid" aria-hidden="true">→</div>
+      <div class="field">
+        <label for="dateB">ต้นทุนวันคำนวณ <span class="hint">(วันจัดทำ/ทบทวนราคากลาง)</span></label>
+        <input type="date" id="dateB">
+      </div>
+    </div>
+    <button class="go" id="goBtn" onclick="compare()">เปรียบเทียบต้นทุน</button>
+    <div class="status" id="status"></div>
+    <div class="error" id="error"></div>
+    <div class="cache-tools"><a href="#" onclick="clearPriceCache();return false;">ล้างข้อมูลราคาที่จำไว้ (ให้ค้นใหม่ทั้งหมด)</a></div>
+  </div>
+
+  <div id="results">
+    <div class="period-line" id="periodLine"></div>
+    <div class="cards" id="cards"></div>
+  </div>
+
+  <div id="analysis">
+    <div class="analysis-box">
+      <h2>บทวิเคราะห์ประกอบการรายงานผู้บริหาร</h2>
+      <div class="analysis-sub">สรุปจากข้อมูลราคาจริงของสองช่วงเวลาที่เลือก</div>
+      <div id="analysisBody"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const ITEMS = [
+  {key:"oil",      name:"น้ำมันดิบ Brent (Oil)",      unit:"USD ต่อ บาร์เรล",      digits:2},
+  {key:"copper",   name:"ทองแดง LME (Copper)",        unit:"USD ต่อ ตัน",          digits:0},
+  {key:"aluminum", name:"อะลูมิเนียม LME (Aluminum)", unit:"USD ต่อ ตัน",          digits:0},
+  {key:"steel",    name:"เหล็ก HRC (Steel)",          unit:"USD ต่อ ตัน",          digits:0},
+  {key:"usdthb",   name:"อัตราแลกเปลี่ยน THB/USD",    unit:"บาท ต่อ 1 ดอลลาร์",    digits:2},
+  {key:"cnythb",   name:"อัตราแลกเปลี่ยน THB/CNY",    unit:"บาท ต่อ 1 หยวน",       digits:3},
+];
+
+(function init(){
+  const today = new Date();
+  const prev  = new Date(); prev.setDate(prev.getDate()-30);
+  const fmt = d => d.toISOString().slice(0,10);
+  document.getElementById("dateB").value = fmt(today);
+  document.getElementById("dateA").value = fmt(prev);
+  document.getElementById("dateB").max = fmt(today);
+  document.getElementById("dateA").max = fmt(today);
+})();
+
+const thDate = iso => {
+  if(!iso) return "-";
+  const [y,m,d] = iso.split("-").map(Number);
+  const months = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  return `${d} ${months[m-1]} ${y+543}`;
+};
+const numFmt = (v,d) => Number(v).toLocaleString("th-TH",{minimumFractionDigits:d,maximumFractionDigits:d});
+
+// ---- ตัวช่วยเรียก Claude API ผ่าน Netlify Function (เก็บ key ฝั่งเซิร์ฟเวอร์) ----
+const API_URL = "/.netlify/functions/claude";
+
+async function callClaude(prompt, useSearch, onProgress, model){
+  let messages = [{role:"user", content:prompt}];
+  let allText = "";
+  for(let rounds = 1; rounds <= 4; rounds++){
+    if(onProgress) onProgress(rounds);
+    const body = {
+      model: model || "claude-sonnet-4-6",
+      max_tokens:1000,
+      messages:messages
+    };
+    if(useSearch) body.tools = [{type:"web_search_20250305", name:"web_search", max_uses:2}];
+
+    const response = await fetch(API_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(body)
+    });
+    let data;
+    try{ data = await response.json(); }
+    catch(_){ throw new Error(`เซิร์ฟเวอร์ตอบกลับผิดรูปแบบ (HTTP ${response.status}) — อาจเกิดจาก Function หมดเวลา ลองใหม่อีกครั้ง`); }
+    if(data.error) throw new Error(data.error.message || "API error");
+
+    allText += (data.content||[])
+      .filter(x => x.type === "text")
+      .map(x => x.text).join("");
+
+    messages.push({role:"assistant", content:data.content});
+
+    if(data.stop_reason === "pause_turn") continue;
+    if(data.stop_reason === "max_tokens"){
+      messages.push({role:"user", content:"Continue your output exactly from where it was cut off. Output ONLY the remaining characters, nothing else."});
+      continue;
+    }
+    break;
+  }
+  return allText;
+}
+
+// ดึง JSON ออกจากข้อความ แม้มีคำอธิบายหรือ markdown ปะปน
+function extractJson(text){
+  const clean = text.replace(/```json|```/g,"").trim();
+  const s = clean.indexOf("{");
+  const e = clean.lastIndexOf("}");
+  if(s >= 0 && e > s){
+    try{ return JSON.parse(clean.slice(s, e+1)); }catch(_){}
+  }
+  for(let i = clean.indexOf("{"); i >= 0; i = clean.indexOf("{", i+1)){
+    let depth = 0, inStr = false, esc = false;
+    for(let j = i; j < clean.length; j++){
+      const ch = clean[j];
+      if(esc){ esc = false; continue; }
+      if(ch === "\\"){ esc = true; continue; }
+      if(ch === '"'){ inStr = !inStr; continue; }
+      if(inStr) continue;
+      if(ch === "{") depth++;
+      else if(ch === "}"){
+        depth--;
+        if(depth === 0){
+          try{ return JSON.parse(clean.slice(i, j+1)); }catch(_){}
+          break;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+async function compare(){
+  const a = document.getElementById("dateA").value;
+  const b = document.getElementById("dateB").value;
+  const errBox = document.getElementById("error");
+  errBox.style.display = "none";
+
+  if(!a || !b){ showError("กรุณาเลือกวันที่ให้ครบทั้ง 2 ช่อง"); return; }
+  if(a === b){ showError("วันเปิดซองและวันคำนวณต้องไม่ใช่วันเดียวกัน"); return; }
+
+  const btn = document.getElementById("goBtn");
+  const status = document.getElementById("status");
+  btn.disabled = true;
+  document.getElementById("results").style.display = "none";
+  document.getElementById("analysis").style.display = "none";
+
+  // คำอธิบายตลาดอ้างอิงของแต่ละรายการ (ใช้สร้าง prompt แยกทีละตัว)
+  const MARKET_SPEC = {
+    oil:      "Brent crude oil price, USD per barrel",
+    copper:   "LME Copper cash/official price, USD per tonne",
+    aluminum: "LME Aluminium cash/official price, USD per tonne",
+    steel:    "Hot-rolled coil (HRC) steel benchmark price, USD per tonne",
+    usdthb:   "USD/THB exchange rate (Thai Baht per 1 US Dollar)",
+    cnythb:   "CNY/THB exchange rate (Thai Baht per 1 Chinese Yuan)"
+  };
+
+  const itemPrompt = key => `Find the actual historical value of: ${MARKET_SPEC[key]}
+on two dates: DATE_A = ${a} and DATE_B = ${b}.
+If a date falls on a weekend or market holiday, use the closest PRIOR trading day and report the date actually used.
+Search the web (2 quick searches max), then respond with ONLY a valid JSON object, no markdown fences, no explanation, exactly:
+{"a":0,"b":0,"date_a":"YYYY-MM-DD","date_b":"YYYY-MM-DD","source":""}
+where "a" is the value on DATE_A, "b" on DATE_B, "source" is a short source name.`;
+
+  // อัตราแลกเปลี่ยนดึงจาก API ฟรี (ECB ผ่าน Frankfurter) — ไม่เสียเครดิต AI เลย
+  async function fetchFx(base, dA, dB){
+    const get = async d => {
+      const r = await fetch(`https://api.frankfurter.dev/v1/${d}?base=${base}&symbols=THB`);
+      if(!r.ok) throw new Error("FX API HTTP " + r.status);
+      const j = await r.json();
+      if(!j.rates || j.rates.THB == null) throw new Error("FX API: no THB rate");
+      return {rate:j.rates.THB, date:j.date};
+    };
+    const [ra, rb] = await Promise.all([get(dA), get(dB)]);
+    return {a:ra.rate, b:rb.rate, date_a:ra.date, date_b:rb.date, source:"ECB (Frankfurter)"};
+  }
+  const FX_BASE = {usdthb:"USD", cnythb:"CNY"};
+
+  // ---- ระบบจำราคา (cache) ----
+  // หลักการ: ราคาปิดของวันที่ผ่านมาแล้วเป็นค่าตายตัว ไม่มีวันเปลี่ยน → จำได้ปลอดภัย 100%
+  // ส่วน "วันนี้" ตลาดยังเปิดอยู่ ราคายังขยับ → ไม่จำ เพื่อรักษาความถูกต้อง
+  const cache = loadJSON(PRICE_CACHE_KEY);
+  const cGet = (k,d) => cache[k + "|" + d] || null;
+  const cPut = (k,d,v,actualDate,src) => {
+    if(isFinalDate(d) && v != null) cache[k + "|" + d] = {v:v, d:actualDate || d, s:src || ""};
+  };
+
+  const singleDatePrompt = (key, d) => `Find the actual historical value of: ${MARKET_SPEC[key]} on the date ${d}.
+If that date is a weekend or market holiday, use the closest PRIOR trading day and report the date actually used.
+Search the web (2 quick searches max), then respond with ONLY a valid JSON object, no markdown fences, no explanation, exactly:
+{"v":0,"date":"YYYY-MM-DD","source":""}`;
+
+  try{
+    // ขั้นที่ 0: ตรวจการเชื่อมต่อระบบ (ทำครั้งแรกครั้งเดียว หลังจากนั้นข้ามเพื่อความเร็ว)
+    if(!localStorage.getItem("mea_conn_ok")){
+      status.innerHTML = '<span class="spinner"></span> กำลังตรวจสอบการเชื่อมต่อระบบ…';
+      try{
+        await callClaude("Reply with only the word: OK", false, null, "claude-haiku-4-5");
+        localStorage.setItem("mea_conn_ok", "1");
+      }catch(e){
+        throw new Error(friendlyError(e.message));
+      }
+    }
+
+    // ขั้นที่ 1: หาราคาแบบขนาน — ลำดับความประหยัด: ความจำ → API ฟรี → AI ค้นเฉพาะที่ขาด
+    let done = 0;
+    let lastError = null;
+    const updateStatus = () => {
+      status.innerHTML = `<span class="spinner"></span> กำลังค้นหาราคาจริงจากตลาดโลก… สำเร็จแล้ว ${done}/${ITEMS.length} รายการ`;
+    };
+    updateStatus();
+
+    const entries = await Promise.all(ITEMS.map(async item => {
+      let result = null;
+      const ca = cGet(item.key, a), cb = cGet(item.key, b);
+
+      // (1) มีในความจำครบทั้งสองวัน → ใช้ทันที ไม่เสียเครดิต ไม่เสียเวลา
+      if(ca && cb){
+        result = {a:ca.v, b:cb.v, date_a:ca.d, date_b:cb.d,
+                  source:(ca.s === cb.s ? ca.s : [ca.s, cb.s].filter(Boolean).join(", ")),
+                  cached:true};
+      }
+
+      // (2) อัตราแลกเปลี่ยน → API ฟรีของ ECB
+      if(!result && FX_BASE[item.key]){
+        try{
+          result = await fetchFx(FX_BASE[item.key], a, b);
+          cPut(item.key, a, result.a, result.date_a, result.source);
+          cPut(item.key, b, result.b, result.date_b, result.source);
+        }catch(e){ console.warn("FX fallback to AI:", item.key, e); }
+      }
+
+      // (3) มีในความจำวันเดียว → ให้ AI ค้นเฉพาะวันที่ขาด (เร็วขึ้น ถูกลงครึ่งหนึ่ง)
+      if(!result && (ca || cb)){
+        const missing = ca ? b : a;
+        for(let attempt = 1; attempt <= 2 && !result; attempt++){
+          try{
+            const text = await callClaude(singleDatePrompt(item.key, missing), true, null, "claude-haiku-4-5");
+            const r = extractJson(text);
+            if(r && r.v != null){
+              cPut(item.key, missing, r.v, r.date, r.source);
+              result = ca
+                ? {a:ca.v, b:r.v, date_a:ca.d, date_b:r.date || missing, source:[ca.s, r.source].filter(Boolean).join(", ")}
+                : {a:r.v, b:cb.v, date_a:r.date || missing, date_b:cb.d, source:[r.source, cb.s].filter(Boolean).join(", ")};
+            }
+          }catch(e){
+            lastError = e;
+            if(attempt === 2) console.error(item.key, e);
+          }
+        }
+      }
+
+      // (4) ไม่มีข้อมูลเลย → ให้ AI ค้นทั้งสองวันในคำขอเดียว (Haiku ประหยัด)
+      for(let attempt = 1; attempt <= 2 && !result; attempt++){
+        try{
+          const text = await callClaude(itemPrompt(item.key), true, null, "claude-haiku-4-5");
+          const r = extractJson(text);
+          if(r && r.a != null && r.b != null){
+            cPut(item.key, a, r.a, r.date_a, r.source);
+            cPut(item.key, b, r.b, r.date_b, r.source);
+            result = r;
+          }
+        }catch(e){
+          lastError = e;
+          if(attempt === 2) console.error(item.key, e);
+        }
+      }
+
+      done++; updateStatus();
+      return [item.key, result];
+    }));
+    saveJSON(PRICE_CACHE_KEY, cache);
+    const prices = Object.fromEntries(entries);
+    if(!ITEMS.some(it => prices[it.key])){
+      throw new Error(lastError
+        ? "ทุกรายการล้มเหลว — สาเหตุ: " + friendlyError(lastError.message)
+        : "ไม่พบข้อมูลราคาในผลลัพธ์ กรุณาลองกดอีกครั้ง");
+    }
+
+    render(prices, a, b);
+
+    // ขั้นที่ 2: บทวิเคราะห์ — ถ้าคู่วันที่นี้เคยวิเคราะห์แล้ว (และทั้งคู่เป็นวันปิดตลาดแล้ว) ใช้ของเดิมทันที
+    const aCache = loadJSON(ANALYSIS_CACHE_KEY);
+    const aKey = a + "|" + b;
+    const canCacheAnalysis = isFinalDate(a) && isFinalDate(b);
+
+    document.getElementById("analysis").style.display = "block";
+
+    if(canCacheAnalysis && aCache[aKey]){
+      renderAnalysis(aCache[aKey]);
+      const nCached = ITEMS.filter(it => prices[it.key] && prices[it.key].cached).length;
+      status.textContent = `เสร็จสมบูรณ์ ✓ (ใช้ข้อมูลที่จำไว้ ${nCached}/${ITEMS.length} รายการ + บทวิเคราะห์เดิม — ไม่เสียเครดิตเพิ่ม)`;
+      return;
+    }
+
+    status.innerHTML = '<span class="spinner"></span> ได้ราคาครบแล้ว กำลังเขียนบทวิเคราะห์สำหรับผู้บริหาร…';
+    document.getElementById("analysisBody").innerHTML =
+      '<div class="analysis-loading"><span class="spinner"></span> กำลังวิเคราะห์ข้อมูล…</div>';
+
+    const table = ITEMS.map(it => {
+      const p = prices[it.key];
+      if(!p || p.a == null || p.b == null) return `${it.name}: ไม่มีข้อมูล`;
+      const pct = ((p.b - p.a) / p.a * 100).toFixed(2);
+      return `${it.name} (${it.unit}): วันเปิดซอง ${p.a} → วันคำนวณ ${p.b} (เปลี่ยนแปลง ${pct}%)`;
+    }).join("\n");
+
+    const analysisPrompt = `คุณคือนักวิเคราะห์ต้นทุนของฝ่ายพัสดุการไฟฟ้า ข้อมูลเปรียบเทียบต้นทุน ณ วันเปิดซอง (${a}) กับ ณ วันคำนวณ (${b}) มีดังนี้:
+${table}
+
+เขียนบทวิเคราะห์ภาษาไทยกระชับ เป็นทางการ เหมาะสำหรับรายงานผู้บริหาร ตอบกลับเป็น JSON เท่านั้น ห้ามมี markdown fences หรือข้อความอื่น รูปแบบ:
+{"overview":"สรุปภาพรวมตัวเลข รายการใดเปลี่ยนแปลงมาก/น้อย เน้นตัวเลขและเปอร์เซ็นต์จริงจากข้อมูล 3-4 ประโยค","trend":"วิเคราะห์แนวโน้มราคาวัตถุดิบ (โลหะ พลังงาน อัตราแลกเปลี่ยน) ว่าอยู่ในทิศทางใด และมีนัยต่อต้นทุนงานจัดซื้ออุปกรณ์ไฟฟ้าอย่างไร 3-4 ประโยค","reasons":"อธิบายเหตุผลเชิงตลาดที่ทำให้ต้นทุนวันเปิดซองกับวันคำนวณไม่ตรงกัน เช่น ความผันผวนของตลาดโลก อัตราแลกเปลี่ยน ระยะห่างของสองช่วงเวลา เพื่อใช้ชี้แจงผู้บริหาร 3-5 ประโยค"}`;
+
+    const analysisText = await callClaude(analysisPrompt, false, r => {
+      status.innerHTML = `<span class="spinner"></span> กำลังเขียนบทวิเคราะห์ (ขั้นตอนที่ ${r})…`;
+    });
+    const analysis = extractJson(analysisText);
+
+    if(analysis){
+      renderAnalysis(analysis);
+      if(canCacheAnalysis){
+        aCache[aKey] = analysis;
+        saveJSON(ANALYSIS_CACHE_KEY, aCache);
+      }
+    }else{
+      document.getElementById("analysisBody").innerHTML =
+        '<div class="analysis-loading">สร้างบทวิเคราะห์ไม่สำเร็จ — ตัวเลขด้านบนยังใช้งานได้ตามปกติ ลองกดเปรียบเทียบใหม่เพื่อสร้างบทวิเคราะห์อีกครั้ง</div>';
+    }
+
+    const nCached = ITEMS.filter(it => prices[it.key] && prices[it.key].cached).length;
+    status.textContent = nCached > 0
+      ? `เสร็จสมบูรณ์ ✓ (ใช้ข้อมูลที่จำไว้ ${nCached}/${ITEMS.length} รายการ ช่วยประหยัดเครดิต)`
+      : "เสร็จสมบูรณ์ ✓";
+  }catch(err){
+    console.error(err);
+    status.textContent = "";
+    showError("ดึงข้อมูลไม่สำเร็จ: " + err.message);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+// ---- ตัวช่วยเก็บความจำใน localStorage ----
+const PRICE_CACHE_KEY = "mea_price_cache_v1";
+const ANALYSIS_CACHE_KEY = "mea_analysis_cache_v1";
+function loadJSON(k){ try{ return JSON.parse(localStorage.getItem(k)) || {}; }catch(_){ return {}; } }
+function saveJSON(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(_){} }
+const todayISO = () => new Date().toISOString().slice(0,10);
+const isFinalDate = d => d < todayISO();
+
+function clearPriceCache(){
+  localStorage.removeItem(PRICE_CACHE_KEY);
+  localStorage.removeItem(ANALYSIS_CACHE_KEY);
+  const s = document.getElementById("status");
+  if(s) s.textContent = "ล้างข้อมูลราคาที่จำไว้แล้ว ✓ การเปรียบเทียบครั้งถัดไปจะค้นใหม่ทั้งหมด";
+}
+
+function renderAnalysis(analysis){
+  document.getElementById("analysisBody").innerHTML = `
+    <div class="a-section"><h3>ภาพรวมตัวเลข</h3><p>${esc(analysis.overview||"")}</p></div>
+    <div class="a-section"><h3>แนวโน้มราคาวัตถุดิบ</h3><p>${esc(analysis.trend||"")}</p></div>
+    <div class="a-section"><h3>เหตุผลที่ต้นทุนสองช่วงเวลาไม่ตรงกัน</h3><p>${esc(analysis.reasons||"")}</p></div>`;
+}
+
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function render(prices, a, b){
+  document.getElementById("periodLine").innerHTML =
+    `ต้นทุนวันเปิดซอง <b>${thDate(a)}</b> → ต้นทุนวันคำนวณ <b>${thDate(b)}</b>`;
+
+  const wrap = document.getElementById("cards");
+  wrap.innerHTML = "";
+
+  for(const item of ITEMS){
+    const p = prices[item.key];
+    if(!p || p.a == null || p.b == null){
+      wrap.insertAdjacentHTML("beforeend",
+        `<div class="card"><h2>${item.name}</h2><div class="unit">${item.unit}</div>
+         <div class="delta flat" style="margin-top:12px"><span class="abs">ไม่พบข้อมูลของรายการนี้</span></div></div>`);
+      continue;
+    }
+    const diff = p.b - p.a;
+    const pct  = (diff / p.a) * 100;
+    const dir  = Math.abs(pct) < 0.005 ? "flat" : (diff > 0 ? "up" : "down");
+    const sign = diff > 0 ? "+" : "";
+    const label= dir === "up" ? "ปรับขึ้น" : dir === "down" ? "ปรับลง" : "คงที่";
+    const arrowChar = dir === "up" ? "▲" : dir === "down" ? "▼" : "▬";
+
+    wrap.insertAdjacentHTML("beforeend", `
+      <div class="card">
+        <h2>${item.name}</h2>
+        <div class="unit">${item.unit}</div>
+        <div class="prices">
+          <div>
+            <div class="p-label">วันเปิดซอง</div>
+            <div class="p-val">${numFmt(p.a, item.digits)}</div>
+            <div class="p-date">${thDate(p.date_a || a)}</div>
+          </div>
+          <div>
+            <div class="p-label">วันคำนวณ</div>
+            <div class="p-val">${numFmt(p.b, item.digits)}</div>
+            <div class="p-date">${thDate(p.date_b || b)}</div>
+          </div>
+        </div>
+        <div class="delta ${dir}">
+          <span class="pct">${arrowChar} ${sign}${pct.toFixed(2)}%</span>
+          <span class="abs">${label} ${sign}${numFmt(diff, item.digits)}</span>
+        </div>
+        ${p.source ? `<div class="src">แหล่งข้อมูล: ${esc(p.source)}</div>` : ""}
+      </div>`);
+  }
+  document.getElementById("results").style.display = "block";
+}
+
+// แปลข้อความ error เป็นคำแนะนำที่นำไปแก้ได้ทันที
+function friendlyError(msg){
+  msg = String(msg || "");
+  if(/ANTHROPIC_API_KEY/.test(msg))
+    return "ยังไม่ได้ตั้งค่า ANTHROPIC_API_KEY บน Netlify → ไปที่ Site configuration → Environment variables เพิ่มตัวแปรนี้ แล้วกด Deploy ใหม่อีกครั้ง (สำคัญ: ต้อง deploy ซ้ำหลังตั้งค่า)";
+  if(/HTTP 404/.test(msg))
+    return "ไม่พบ Netlify Function (/.netlify/functions/claude) — มักเกิดจากการ deploy แบบลากไฟล์วาง (Drop) ซึ่งไม่ build Function ให้ กรุณา deploy ผ่าน GitHub (Import from Git) หรือ Netlify CLI แทน";
+  if(/401|invalid x-api-key|authentication/i.test(msg))
+    return "API key ไม่ถูกต้อง — ตรวจค่าใน ANTHROPIC_API_KEY ว่าคัดลอกมาครบ (ขึ้นต้นด้วย sk-ant-) แล้ว Deploy ใหม่";
+  if(/credit|billing|balance/i.test(msg))
+    return "เครดิตในบัญชี Anthropic ไม่เพียงพอ — เติมเครดิตได้ที่ console.anthropic.com → Billing";
+  if(/rate.?limit|429/i.test(msg))
+    return "เรียกใช้งานถี่เกินลิมิตชั่วคราว — รอประมาณ 1 นาทีแล้วลองใหม่";
+  if(/หมดเวลา|timed?.?out|502|504/i.test(msg))
+    return "คำขอใช้เวลานานเกินลิมิตของ Netlify Function — ลองกดใหม่อีกครั้ง (ถ้าเกิดบ่อย พิจารณาอัปเกรดแผน Netlify เพื่อขยายเวลา Function)";
+  return msg;
+}
+
+function showError(msg){
+  const e = document.getElementById("error");
+  e.textContent = msg;
+  e.style.display = "block";
+}
+</script>
+</body>
+</html>
